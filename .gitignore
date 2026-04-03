@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Database - keep the structure but ignore data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+materials.db
+
+# Generated content
+generated_content.txt
+queue_*.json
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project specific
+content_pool/raw/
+content_pool/refined/
+content_pool/products/
+__pycache__/
+*.pyc
+
+# Keep these
+!.gitkeep

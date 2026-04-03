@@ -1,0 +1,21 @@
+# Core dependencies
+openai>=1.0.0
+pymupdf>=1.23.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Database
+# (sqlite3 is built-in with Python 3.10+)
+
+# Optional: for browser automation (爬虫扩展)
+selenium>=4.15.0
+playwright>=1.40.0
+
+# Optional: for PDF generation
+reportlab>=4.0.0
+markdown>=3.5.0
+
+# Development
+pytest>=7.4.0
+black>=23.0.0
