@@ -4,79 +4,68 @@ AI-powered content automation system for content creation, curation, and multi-p
 
 ## Features
 
-- **Material Pool** - SQLite-based content storage for raw materials, refined atoms, and products
+- **Material Pool** - SQLite-based content storage with quality scoring
+- **Thinking Models** - Cross-disciplinary classification (Cognitive Bias, Compound Effect, Human Nature, etc.)
+- **Emotional Resonance** - Content tagged with emotional triggers (Anxiety, Hope, Recognition, Surprise)
 - **Content Dispatcher** - Automated pipeline: crawl → refine → rewrite → dispatch
-- **Multi-Platform Support** - Weibo, Xiaohongshu (Little Red Book), Douyin, WeChat Public Account
-- **Scheduled Execution** - Windows Task Scheduler integration for automated workflows
+- **Multi-Platform Support** - Weibo, Xiaohongshu, Douyin, WeChat Public Account
+- **Quality Control** - Automatic quality scoring and routing
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- Windows (for scheduled tasks)
-
-### Installation
-
 ```bash
-# Clone the repository
-git clone https://github.com/jeremyko11/auto-assistance.git
 cd auto-assistance
 
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Usage
-
-```bash
 # Interactive menu
 python dispatcher/cli.py
 
 # Command line modes
 python dispatcher/content_dispatcher.py --mode full --skip-crawl
 python dispatcher/content_dispatcher.py --status
-python dispatcher/content_dispatcher.py --mode refine
-python dispatcher/content_dispatcher.py --mode rewrite --platforms 微博 小红书
 ```
-
-### Configuration
-
-Edit `dispatcher/content_dispatcher.py` to configure:
-
-- LLM API credentials (Xunfei Mars API)
-- Platform cookies for posting
-- Batch sizes and intervals
 
 ## Project Structure
 
 ```
 auto-assistance/
-├── material_pool.py              # Core database module
+├── material_pool.py              # Core database with quality scoring
 ├── dispatcher/
 │   ├── content_dispatcher.py    # Main pipeline engine
 │   ├── cli.py                  # Interactive menu
 │   └── poster.py               # Platform posting integration
 ├── content_pool/               # Content storage
-│   ├── materials.db           # SQLite database
-│   ├── queue_*.json           # Pending publish queues
-│   └── generated_content.txt  # Generated content log
-└── setup_schedules.bat        # Windows Task Scheduler setup
+│   └── materials.db            # SQLite database
+└── setup_schedules.bat        # Windows Task Scheduler
 ```
 
 ## Workflow
 
 ```
-[1] Crawl     → Fetch content from platforms (Douyin, Weibo, Toutiao)
-[2] Refine    → LLM extraction of atoms (quotes, cases, cognition, actions)
-[3] Rewrite   → Adapt content for different platforms
-[4] Dispatch  → Queue for manual publishing or API auto-post
+[1] Crawl     → Fetch content from platforms
+[2] Refine    → LLM extraction with ThinkingModel + Emotional tags
+[3] Rewrite   → Adapt for different platforms with professional prompts
+[4] Dispatch  → Queue for publishing or auto-post
 ```
+
+## Quality Scoring
+
+Each atom is scored on:
+- **Completeness** - Content depth and structure
+- **Uniqueness** - Deduplication against existing content
+- **IP Fit** - Alignment with IP direction keywords
+- **Actionable** - Practical value for audience
+- **Emotional** - Emotional resonance potential
+
+## Thinking Models
+
+Classification system from查理·芒格 methodology:
+- Cognitive Bias (认知偏差)
+- Compound Effect (复利效应)
+- Human Nature (人性本质)
+- Career Strategy (职场策略)
+- Relationship Dynamics (关系动力学)
+- Systems Thinking (系统思维)
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-Contributions welcome! Feel free to submit issues and pull requests.
+MIT License

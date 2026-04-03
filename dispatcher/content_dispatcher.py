@@ -253,8 +253,10 @@ class ContentDispatcher:
         return results
 
     def _extract_atoms_from_raw(self, raw_material: Dict) -> List[str]:
-        """从原始素材提炼原子"""
-        prompt = f"""从以下原始素材中提炼「可复用内容原子」。
+        """从原始素材提炼原子 - 增强版（集成 ip-arsenal 方法论）"""
+        prompt = f"""你是知识管理专家，使用Zettelkasten方法处理内容。
+
+任务：从以下素材中提炼「原子笔记」——每个观点一张卡片，独立完整。
 
 【素材信息】
 - 来源：{raw_material['platform']}
@@ -263,12 +265,23 @@ class ContentDispatcher:
 - 内容：
 {raw_material['content'][:2000]}
 
-请提取3-5个最有价值的原子，每个必须包含：
+【提炼要求】
+每个原子必须包含：
 1. type: "quote"(金句) / "case"(案例) / "cognition"(认知) / "action"(行动)
-2. content: 核心内容（50-200字）
-3. tags: 标签数组（3-5个）
-4. risk_level: 0(安全)/1(需语境)/2(禁用)
-5. shelf_life: "long"(长效)/"medium"(中效)/"short"(短效)
+2. content: 核心观点（50-200字，用自己的话表达）
+3. thinking_model: 思维模型（认知偏差/复利效应/人性本质/职场策略等）
+4. emotional_resonance: 情感共鸣点（焦虑/希望/认同/惊讶/好奇/赋能）
+5. target_audience: 目标受众（职场人/创业者/情感困惑者等）
+6. applicable_scenarios: 适用场景（短视频/文章/直播/金句）
+7. tags: 标签数组（3-5个）
+8. risk_level: 0(安全)/1(需语境)
+9. shelf_life: "long"(长效)/"medium"(中效)
+
+【重要】
+- 只输出JSON数组，不要其他文字
+- 优先提取有情感共鸣的实用观点
+- 保留反常识洞察，放弃陈词滥调
+- 每条content必须是完整的独立观点
 
 请以JSON数组格式输出："""
 
@@ -307,7 +320,11 @@ class ContentDispatcher:
                     content=atom.get("content", ""),
                     tags=atom.get("tags", []),
                     risk_level=atom.get("risk_level", 0),
-                    shelf_life=atom.get("shelf_life", "long")
+                    shelf_life=atom.get("shelf_life", "long"),
+                    thinking_model=atom.get("thinking_model", ""),
+                    emotional_resonance=atom.get("emotional_resonance", []),
+                    target_audience=atom.get("target_audience", []),
+                    applicable_scenarios=atom.get("applicable_scenarios", [])
                 )
                 atom_ids.append(atom_id)
 
@@ -362,22 +379,73 @@ class ContentDispatcher:
         return results
 
     def _rewrite_for_platform(self, atom: Dict, platform: str) -> Optional[str]:
-        """将原子改写为特定平台格式"""
-        prompt_templates = {
-            "微博": "140字以内，有话题标签(如#认知升级#)，结尾引导评论",
-            "小红书": "使用emoji和清单格式，突出实用价值，结尾引导收藏",
-            "抖音": "3秒开头钩子抓注意力，结尾引导评论互动",
-            "公众号": "深度文章风格，有案例有结论，逻辑严密"
+        """将原子改写为特定平台格式 - 增强版"""
+        prompts = {
+            "微博": f"""你是一位微博大V，擅长创作引发共鸣的短内容。
+
+【素材】
+{atom.get('content', '')}
+思维模型：{atom.get('thinking_model', '')}
+情感共鸣：{', '.join(atom.get('emotional_resonance', []))}
+
+【要求】
+- 140字以内
+- 必须有话题标签(如 #{atom.get('tags', ['认知'])[0]}#)
+- 开头3秒必须抓住注意力（痛点/反常识/数据冲击）
+- 结尾引导评论互动
+- 符合微博传播规律：有态度、有价值、有槽点
+
+直接输出内容，不要前缀。""",
+
+            "小红书": f"""你是一位小红书爆款博主，擅长创作高收藏量内容。
+
+【素材】
+{atom.get('content', '')}
+目标受众：{', '.join(atom.get('target_audience', ['年轻人']))}
+
+【要求】
+- 使用丰富的emoji（💡🔥✨❌✅💬）
+- 结构清晰：分段+列表
+- 开头钩子：痛点共鸣或反常识
+- 结尾引导收藏（"收藏这篇下次用"）
+- 实用价值优先
+- 标签丰富（5-8个）
+
+直接输出内容。""",
+
+            "抖音": f"""你是一位抖音知识博主，擅长创作高完播率口播稿。
+
+【素材】
+{atom.get('content', '')}
+适用场景：{', '.join(atom.get('applicable_scenarios', ['短视频']))}
+
+【要求】
+- 60秒口播稿（约150字）
+- 开头3秒必须留人（提问/反常识/悬念）
+- 中间逻辑清晰，有案例或金句
+- 结尾引导评论（"认同的扣1"）
+- 语言口语化，像在和人聊天
+- 有节奏感，短句为主
+
+直接输出口播稿。""",
+
+            "公众号": f"""你是一位公众号深度文章作者，擅长写有深度的长文。
+
+【素材】
+{atom.get('content', '')}
+思维模型：{atom.get('thinking_model', '')}
+
+【要求】
+- 1500-2000字深度文章
+- 结构：问题引入→理论解读→案例分析→行动建议
+- 有独特观点，不是资料搬运
+- 结尾引导点在看/转发
+- 逻辑严密，论证充分
+
+直接输出文章。"""
         }
 
-        prompt = f"""将以下内容改写为「{platform}」适用的版本。
-
-原子素材：{atom['content']}
-标签：{', '.join(atom.get('tags', []))}
-
-要求：{prompt_templates.get(platform, '改写为适合发布的内容')}
-
-直接输出改写后的内容。"""
+        prompt = prompts.get(platform, f"改写为适合{platform}的内容，直接输出。")
 
         try:
             from openai import OpenAI
@@ -504,6 +572,13 @@ class ContentDispatcher:
         print(f"║  📦 素材池                                                   ║")
         print(f"║     原始素材: {stats.get('raw_total', 0):>4}  (待处理: {stats.get('raw_by_status', {}).get('pending', 0):>3})               ║")
         print(f"║     原子素材: {stats.get('atoms_total', 0):>4}  (金句:{stats.get('atoms_by_type', {}).get('quote', 0):>3} 案例:{stats.get('atoms_by_type', {}).get('case', 0):>3} 认知:{stats.get('atoms_by_type', {}).get('cognition', 0):>3})   ║")
+
+        # 显示思维模型分布
+        if stats.get('atoms_by_model'):
+            model_sample = list(stats['atoms_by_model'].items())[:3]
+            model_str = " / ".join([f"{m[:4]}:{c}" for m, c in model_sample])
+            print(f"║     💡思维模型: {model_str}            ║")
+
         print(f"║     产品: {stats.get('products_total', 0):>4}  (已发布: {stats.get('products_by_status', {}).get('published', 0):>3})              ║")
 
         print(f"║                                                              ║")
