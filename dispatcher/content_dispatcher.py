@@ -173,6 +173,118 @@ class ContentDispatcher:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    def generate_from_topic(self, topic: str, count: int = 5) -> Dict[str, Any]:
+        """根据话题生成素材（LLM直接生成，无需爬取）"""
+        self.log_section(f"话题生成: {topic}")
+
+        prompt = f"""你是一个内容策划师，根据给定话题生成{count}条高质量原始素材。
+
+话题：{topic}
+
+【素材要求】
+每条素材需包含：
+- platform: 来源平台（微博/抖音/小红书/今日头条），分散开
+- author: 拟人化作者名（如"九边"、"职场大叔"等）
+- title: 吸引人的标题（15-30字）
+- content: 详细内容（300-800字），要有观点、有案例、有金句
+- tags: 3-5个标签
+
+【风格要求】
+- 内容要有深度，不是浮于表面
+- 有反常识观点或独特视角
+- 情感共鸣强（焦虑/希望/认同）
+- 实用性强，能给人启发
+
+请生成{count}条素材，输出JSON数组格式："""
+
+        try:
+            from openai import OpenAI
+            client = OpenAI(
+                api_key=self.config.llm.api_key,
+                base_url=self.config.llm.base_url
+            )
+
+            response = client.chat.completions.create(
+                model=self.config.llm.model_id,
+                messages=[
+                    {"role": "system", "content": "你是内容策划专家，擅长创作引发共鸣的深度内容。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=4000,
+                temperature=0.8
+            )
+
+            result_text = response.choices[0].message.content.strip()
+
+            # 解析JSON
+            if result_text.startswith("```"):
+                result_text = result_text.split("```")[1]
+                if result_text.startswith("json"):
+                    result_text = result_text[4:]
+                result_text = result_text.strip()
+
+            materials = json.loads(result_text)
+            added_count = 0
+
+            for m in materials:
+                self.pool.add_raw_material(
+                    platform=m.get("platform", "微博"),
+                    author=m.get("author", "未知"),
+                    title=m.get("title", ""),
+                    content=m.get("content", ""),
+                    url="",
+                    tags=m.get("tags", [topic])
+                )
+                added_count += 1
+
+            self.log(f"✅ 已生成 {added_count} 条素材")
+            return {"generated": added_count, "topic": topic}
+
+        except Exception as e:
+            self.log(f"❌ 素材生成失败: {e}", "ERROR")
+            return {"generated": 0, "error": str(e)}
+
+    def run_full_flow(self, topic: str, platforms: List[str] = None) -> Dict[str, Any]:
+        """从话题到发布的完整流程"""
+        if platforms is None:
+            platforms = ["微博", "小红书", "抖音", "今日头条"]
+
+        self.log_section(f"完整流程: {topic} → 多平台发布")
+
+        results = {}
+
+        # Step 1: 话题生成素材
+        gen = self.generate_from_topic(topic)
+        results["generate"] = gen
+        if gen.get("generated", 0) == 0:
+            return results
+
+        # Step 2: 提炼原子
+        refine = self.run_refine(raw_limit=gen["generated"])
+        results["refine"] = refine
+
+        # Step 3: 多平台改写
+        rewrite = self.run_rewrite(atom_limit=10, target_platforms=platforms)
+        results["rewrite"] = rewrite
+
+        # Step 4: 加入待发布队列
+        dispatch = self.run_dispatch(platforms=platforms, auto=False)
+        results["dispatch"] = dispatch
+
+        self.log_section("流程完成")
+        print(f"""
+╔══════════════════════════════════════════════════════════════╗
+║                    📊 执行结果汇总                          ║
+╠══════════════════════════════════════════════════════════════╣
+║  话题: {topic}
+║  生成素材: {gen.get('generated', 0)} 条
+║  提炼原子: {refine.get('atoms_created', 0)} 个
+║  改写平台: {rewrite.get('rewritten', 0)} 条
+║  待发布队列: {sum(dispatch.get('platforms', {}).values())} 条
+╚══════════════════════════════════════════════════════════════╝
+""")
+        return results
+
     def _import_crawl_results(self) -> int:
         """从爬虫输出导入素材"""
         count = 0
@@ -799,13 +911,14 @@ def main():
         """
     )
 
-    parser.add_argument("--mode", choices=["full", "crawl", "refine", "rewrite", "dispatch", "report", "menu"],
+    parser.add_argument("--mode", choices=["full", "crawl", "refine", "rewrite", "dispatch", "report", "menu", "topic"],
                         default="menu", help="运行模式")
     parser.add_argument("--skip-crawl", action="store_true", help="跳过爬取阶段")
     parser.add_argument("--auto", action="store_true", help="开启自动发布")
     parser.add_argument("--status", action="store_true", help="显示当前状态")
     parser.add_argument("--queue", metavar="PLATFORM", help="查看待发布队列")
     parser.add_argument("--platforms", nargs="+", default=["微博"], help="目标平台")
+    parser.add_argument("--topic", type=str, help="输入话题，自动跑完整流程")
 
     args = parser.parse_args()
 
@@ -833,6 +946,12 @@ def main():
         print(dispatcher.run_dispatch(platforms=args.platforms, auto=args.auto))
     elif args.mode == "report":
         print(dispatcher.get_daily_report())
+    elif args.mode == "topic" or args.topic:
+        topic = args.topic or input("请输入话题: ").strip()
+        if topic:
+            dispatcher.run_full_flow(topic, platforms=args.platforms)
+        else:
+            print("❌ 话题不能为空")
 
 
 if __name__ == "__main__":
