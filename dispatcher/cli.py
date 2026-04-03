@@ -15,10 +15,10 @@ import sys
 from pathlib import Path
 
 # 确保项目根目录在路径中
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.dispatcher.content_dispatcher import ContentDispatcher, DispatchConfig
+from dispatcher.content_dispatcher import ContentDispatcher, DispatchConfig
 
 
 def clear_screen():
@@ -182,12 +182,12 @@ def setup_schedules():
     choice = input("请输入选项: ").strip()
 
     if choice == "1":
-        script = PROJECT_ROOT / "scripts" / "setup_schedules.bat"
+        script = PROJECT_ROOT / "setup_schedules.bat"
         print(f"\n请以管理员身份运行: {script}")
         print("或手动运行后选择 [1]")
 
     elif choice == "2":
-        script = PROJECT_ROOT / "scripts" / "setup_schedules.bat"
+        script = PROJECT_ROOT / "setup_schedules.bat"
         print(f"\n请以管理员身份运行: {script}")
         print("或手动运行后选择 [2]")
 

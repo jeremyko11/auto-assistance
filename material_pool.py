@@ -36,8 +36,11 @@ from difflib import SequenceMatcher
 if sys.platform == "win32":
     try:
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        # 只在未包装时包装
+        if not isinstance(sys.stdout, io.TextIOWrapper):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        if not isinstance(sys.stderr, io.TextIOWrapper):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     except Exception:
         pass
 
@@ -370,6 +373,32 @@ class MaterialPool:
                 FOREIGN KEY (raw_id) REFERENCES raw_materials(id)
             )
         """)
+
+        # 迁移：为已有数据库添加新字段
+        try:
+            c.execute("ALTER TABLE atom_materials ADD COLUMN thinking_model TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass  # 字段已存在
+        try:
+            c.execute("ALTER TABLE atom_materials ADD COLUMN emotional_resonance TEXT DEFAULT '[]'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE atom_materials ADD COLUMN target_audience TEXT DEFAULT '[]'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE atom_materials ADD COLUMN applicable_scenarios TEXT DEFAULT '[]'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE atom_materials ADD COLUMN platform_tags TEXT DEFAULT '{}'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE atom_materials ADD COLUMN quality_score REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass
 
         c.execute("""
             CREATE TABLE IF NOT EXISTS products (

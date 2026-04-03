@@ -32,16 +32,19 @@ from enum import Enum
 if sys.platform == "win32":
     try:
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        # 只在未包装时包装
+        if not isinstance(sys.stdout, io.TextIOWrapper):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        if not isinstance(sys.stderr, io.TextIOWrapper):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     except Exception:
         pass
 
 # 添加项目根目录到路径
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.material_pool import MaterialPool
+from material_pool import MaterialPool
 
 
 # ========== 配置 ==========
@@ -340,7 +343,7 @@ class ContentDispatcher:
         if atom_limit is None:
             atom_limit = self.config.rewrite_batch_size
         if target_platforms is None:
-            target_platforms = ["微博", "小红书", "抖音"]
+            target_platforms = ["微博", "小红书", "抖音", "今日头条"]
 
         self.log_section("阶段3: 改写")
 
@@ -381,7 +384,7 @@ class ContentDispatcher:
     def _rewrite_for_platform(self, atom: Dict, platform: str) -> Optional[str]:
         """将原子改写为特定平台格式 - 增强版"""
         prompts = {
-            "微博": f"""你是一位微博大V，擅长创作引发共鸣的短内容。
+            "微博": f"""你是一位微博大V，擅长创作引发共鸣的深度短内容。
 
 【素材】
 {atom.get('content', '')}
@@ -389,9 +392,11 @@ class ContentDispatcher:
 情感共鸣：{', '.join(atom.get('emotional_resonance', []))}
 
 【要求】
-- 140字以内
+- 200-400字的长微博（比传统140字更长但保持精炼）
 - 必须有话题标签(如 #{atom.get('tags', ['认知'])[0]}#)
+- 结构：开头钩子→核心观点展开→金句收尾→互动引导
 - 开头3秒必须抓住注意力（痛点/反常识/数据冲击）
+- 有2-3个分段，逻辑清晰
 - 结尾引导评论互动
 - 符合微博传播规律：有态度、有价值、有槽点
 
@@ -402,13 +407,15 @@ class ContentDispatcher:
 【素材】
 {atom.get('content', '')}
 目标受众：{', '.join(atom.get('target_audience', ['年轻人']))}
+思维模型：{atom.get('thinking_model', '')}
 
 【要求】
-- 使用丰富的emoji（💡🔥✨❌✅💬）
-- 结构清晰：分段+列表
+- 800-1200字深度内容（知识干货类）
+- 使用丰富的emoji（💡🔥✨❌✅💬📌）
+- 结构：开头痛点共鸣→3-5个核心要点（分段）→实用建议→结尾金句
 - 开头钩子：痛点共鸣或反常识
-- 结尾引导收藏（"收藏这篇下次用"）
-- 实用价值优先
+- 中间有表格、清单、步骤等可视化元素
+- 结尾引导收藏（"收藏这篇下次用"）+ 关注引导
 - 标签丰富（5-8个）
 
 直接输出内容。""",
@@ -420,7 +427,7 @@ class ContentDispatcher:
 适用场景：{', '.join(atom.get('applicable_scenarios', ['短视频']))}
 
 【要求】
-- 60秒口播稿（约150字）
+- 60秒口播稿（约150-200字）
 - 开头3秒必须留人（提问/反常识/悬念）
 - 中间逻辑清晰，有案例或金句
 - 结尾引导评论（"认同的扣1"）
@@ -429,14 +436,34 @@ class ContentDispatcher:
 
 直接输出口播稿。""",
 
+            "今日头条": f"""你是一位今日头条深度作者，擅长创作高阅读量长文。
+
+【素材】
+{atom.get('content', '')}
+思维模型：{atom.get('thinking_model', '')}
+情感共鸣：{', '.join(atom.get('emotional_resonance', []))}
+
+【要求】
+- 1200-1800字深度文章
+- 结构：热点引入→背景分析→核心观点（3-4个）→案例解读→总结升华
+- 开头100字必须抓住注意力（悬念/争议/数据）
+- 标题有吸引力：疑问句/数字/对比
+- 中间分段清晰，每段有独立小标题或序号
+- 有2-3个实际案例或故事
+- 结尾有思考引导，不做总结式说教
+- 配图建议（可选，用括号标注）
+
+直接输出文章内容和标题。""",
+
             "公众号": f"""你是一位公众号深度文章作者，擅长写有深度的长文。
 
 【素材】
 {atom.get('content', '')}
 思维模型：{atom.get('thinking_model', '')}
+情感共鸣：{', '.join(atom.get('emotional_resonance', []))}
 
 【要求】
-- 1500-2000字深度文章
+- 1500-2500字深度文章
 - 结构：问题引入→理论解读→案例分析→行动建议
 - 有独特观点，不是资料搬运
 - 结尾引导点在看/转发
@@ -454,13 +481,23 @@ class ContentDispatcher:
                 base_url=self.config.llm.base_url
             )
 
+            # 根据平台调整max_tokens
+            token_map = {
+                "微博": 800,
+                "小红书": 2500,
+                "抖音": 600,
+                "今日头条": 3500,
+                "公众号": 4000
+            }
+            max_tokens = token_map.get(platform, 2000)
+
             response = client.chat.completions.create(
                 model=self.config.llm.model_id,
                 messages=[
                     {"role": "system", "content": f"你是{platform}内容创作专家。"},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1000,
+                max_tokens=max_tokens,
                 temperature=0.8
             )
 
@@ -532,9 +569,13 @@ class ContentDispatcher:
 
     def _post_to_platform(self, platform: str, content: str) -> bool:
         """调用平台API发布内容"""
-        # TODO: 接入 baoyu-post-to-weibo 等 skill
-        # 目前只是模拟发布成功
-        return True
+        # 自动发帖需要运行独立的poster脚本
+        # 当前版本：内容已加入待发布队列
+        # 使用以下命令手动触发自动发帖：
+        #   python dispatcher/weibo_poster.py --file content_pool/queue_微博.json
+        #   python dispatcher/xiaohongshu_poster.py --file content_pool/queue_小红书.json
+        self.log(f"已加入 {platform} 待发布队列，请手动运行poster发布", "WARN")
+        return False
 
     def _add_to_queue(self, platform: str, atom: Dict, content: str):
         """加入待发布队列"""
@@ -587,7 +628,7 @@ class ContentDispatcher:
             print(f"║     {platform}: {count:>3} 条                                              ║")
 
         # 检查待发布队列
-        for platform in ["微博", "小红书", "抖音"]:
+        for platform in ["微博", "小红书", "抖音", "今日头条"]:
             queue_file = self.project_root / "content_pool" / f"queue_{platform}.json"
             if queue_file.exists():
                 try:
@@ -608,7 +649,7 @@ class ContentDispatcher:
 
     def show_queue(self, platform: str = None):
         """显示待发布队列"""
-        platforms = [platform] if platform else ["微博", "小红书", "抖音"]
+        platforms = [platform] if platform else ["微博", "小红书", "抖音", "今日头条"]
 
         for p in platforms:
             queue_file = self.project_root / "content_pool" / f"queue_{p}.json"
