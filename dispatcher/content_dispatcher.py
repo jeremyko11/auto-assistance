@@ -453,10 +453,29 @@ class ContentDispatcher:
             atom_ids = []
 
             for atom in atoms_data:
+                # 合并新字段到content供后续改写使用
+                cognition = atom.get("cognition", "")
+                golden = atom.get("golden_sentence", "")
+                action = atom.get("action", "")
+                hook = atom.get("emotional_hook", "")
+
+                # 组合content
+                content_parts = []
+                if cognition:
+                    content_parts.append(f"【认知】{cognition}")
+                if golden:
+                    content_parts.append(f"【金句】{golden}")
+                if action:
+                    content_parts.append(f"【行动】{action}")
+                if hook:
+                    content_parts.append(f"【情绪钩子】{hook}")
+
+                content = "\n".join(content_parts) if content_parts else atom.get("content", "")
+
                 atom_id = self.pool.add_atom_material(
                     raw_id=raw_material["id"],
                     atom_type=atom.get("type", "quote"),
-                    content=atom.get("content", ""),
+                    content=content,
                     tags=atom.get("tags", []),
                     risk_level=atom.get("risk_level", 0),
                     shelf_life=atom.get("shelf_life", "long"),
